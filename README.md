@@ -1,20 +1,19 @@
- <h1 align="center"> WindowMenu Api v0.2 </h1>
+<h1 align="center"> WindowMenu Api v0.2 </h1>
 <p align="center"> A small library for creating interactive windows. </p>
 
 <h2 align="center"> 🔨 Usage: </h1>
 
 <h3 align="center"> :nerd_face: Explanation: </h1>
-<p>● Registering the item handler so that events are called: </p>
+<p>● Use the library mentioning as depend in plugin.yml  </p>
 
-```php
-// As a parameter you must pass the Main class!
-\your\directory\Window::registerHandler($this);
+```yaml
+depend: WindowMenuPlugin
 ```
 <p>● You can call the class just passing 4 parameters! The first is a provider, which may be your Main class. The second a Position, depending on the situation you can pass an instance of Player! The third is a string containing the menu name. The fourth and last containing a menu context. Example of a context: </p>
 
 ```php
 // The menu Callable receives 3 parameters, an InventoryTransacion Event (which can and should be canceled), a Player object, and an Item Object (which has been transitioned)
-  
+
 $callable = function (Window $window, Player $player, Item $item, InventoryTransactionEvent $event) {
   // doing a little item check...
   if($item->getId() == \pocketmine\item\Item::EMERALD and $item->getCustomName("§dItem Name")){
@@ -26,7 +25,7 @@ $callable = function (Window $window, Player $player, Item $item, InventoryTrans
     $event->setCanceled(true);
   }
 }
-  
+
 ```
 
 <p>● Now that we've created our context, we can call our class Window: </p>

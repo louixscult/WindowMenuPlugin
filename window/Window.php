@@ -114,6 +114,7 @@ namespace your\namespace {
 
         public function transaction(InventoryTransactionEvent $event): bool
         {
+            /** @var \pocketmine\inventory\SimpleTransactionQueue */
             $transaction = $event->getQueue();
             $player = $transaction->getPlayer();
 
@@ -128,7 +129,6 @@ namespace your\namespace {
                     $item = $trans->getTargetItem();
                     try {
                         if ($item->getId() > 0) { // WIN10 ED BE LIKE
-
                             $window->getClosure()->call($window, $window, $player, $item, $event);
 
                             if($event->isCancelled()) {

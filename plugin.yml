@@ -1,0 +1,12 @@
+name: WindowMenuPlugin
+description: WindowMenu library plugin from PocketMine-MP
+version: 0.2
+api: 2.0.0
+main: WindowMenuPlugin\WindowMenuLoader
+authors:
+  - LearXD
+  - louixscult
+commands:
+  windowtest:
+    default: op
+    description: 'Create and send a test window'
