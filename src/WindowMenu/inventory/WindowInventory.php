@@ -1,28 +1,31 @@
 <?php
 
+/*
+*  ██╗░░░░░███████╗░█████╗░██████╗░██╗░░██╗██████╗░
+*  ██║░░░░░██╔════╝██╔══██╗██╔══██╗╚██╗██╔╝██╔══██╗
+*  ██║░░░░░█████╗░░███████║██████╔╝░╚███╔╝░██║░░██║
+*  ██║░░░░░██╔══╝░░██╔══██║██╔══██╗░██╔██╗░██║░░██║
+*  ███████╗███████╗██║░░██║██║░░██║██╔╝╚██╗██████╔╝
+*  ╚══════╝╚══════╝╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚═╝╚═════╝░
+*              Author: LearXD#1044
+*/
+
 namespace WindowMenu\inventory;
 
 use pocketmine\inventory\BaseInventory;
-use pocketmine\inventory\CustomInventory;
 use pocketmine\inventory\FakeBlockMenu;
-use pocketmine\inventory\Inventory;
 use pocketmine\inventory\InventoryType;
-use pocketmine\item\Item;
 use pocketmine\level\Position;
 use pocketmine\nbt\NBT;
-use pocketmine\nbt\tag\ByteTag;
 use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\nbt\tag\IntTag;
-use pocketmine\nbt\tag\NamedTag;
 use pocketmine\nbt\tag\StringTag;
 use pocketmine\network\protocol\BlockEntityDataPacket;
 use pocketmine\network\protocol\ContainerClosePacket;
 use pocketmine\network\protocol\ContainerOpenPacket;
 use pocketmine\network\protocol\UpdateBlockPacket;
 use pocketmine\Player;
-use pocketmine\plugin\Plugin;
-use pocketmine\scheduler\PluginTask;
-use pocketmine\scheduler\Task;
+use pocketmine\scheduler\CallbackTask;
 use pocketmine\Server;
 use WindowMenu\manager\WindowManager;
 
@@ -32,11 +35,8 @@ class WindowInventory extends BaseInventory
     const SINGLE_CHEST = 1;
     const DOUBLE_CHEST = 2;
 
-    const OPEN_COUNTDOWN = 2;
-    const CLOSE_COUNTDOWN = 4;
-
     /** @var string */
-    protected $customName = "";
+    protected $customName = '';
 
     /** @var int */
     protected $type = InventoryType::CHEST;
@@ -50,7 +50,7 @@ class WindowInventory extends BaseInventory
     /** @var FakeBlockMenu */
     protected $holder = null;
 
-    /** @var \Closure|callable */
+    /** @var callable */
     protected $closure = null;
 
     /**
@@ -70,10 +70,8 @@ class WindowInventory extends BaseInventory
         int $type = InventoryType::CHEST
     ) {
         $this->pos = $position->add(0, 2);
-
         $this->customName = $name;
         $this->closure = $context;
-
         $this->type = $type;
         $this->size = $size;
 
@@ -83,11 +81,12 @@ class WindowInventory extends BaseInventory
 
     /**
      * @param Player $who
+     * @return void
      */
     public function onOpen(Player $who)
     {
-        if(!$who->isOnline()) {
-            return false;
+        if (!$who->isOnline()) {
+            return;
         }
 
         $pk = new UpdateBlockPacket();
@@ -125,31 +124,35 @@ class WindowInventory extends BaseInventory
         $inventory = $this;
         $inventory->viewers[spl_object_hash($who)] = $who;
 
-        $pk = new ContainerOpenPacket();
-        $pk->windowid = $who->getWindowId($inventory);
-        $pk->type = $inventory->getType()->getNetworkType();
-        $pk->slots = $inventory->getSize();
-        $pk->x = $inventory->pos->getX();
-        $pk->y = $inventory->pos->getY();
-        $pk->z = $inventory->pos->getZ();
+        $this->process(
+            function () use ($who, $inventory) {
+                $pk = new ContainerOpenPacket();
+                $pk->windowid = $who->getWindowId($inventory);
+                $pk->type = $inventory->getType()->getNetworkType();
+                $pk->slots = $inventory->getSize();
+                $pk->x = $inventory->pos->getX();
+                $pk->y = $inventory->pos->getY();
+                $pk->z = $inventory->pos->getZ();
 
-        $who->dataPacket($pk);
-        $this->sendContents($who);
-        WindowManager::addPlayerWindow($who, $inventory);
-
-        return true;
+                $who->dataPacket($pk);
+                $this->sendContents($who);
+                WindowManager::addPlayerWindow($who, $inventory);
+            }
+        );
     }
 
+    /**
+     * @param Player $who
+     * @return void
+     */
     public function onClose(Player $who)
     {
         if (!$who->isOnline()) {
-            return false;
+            return;
         }
 
-        if(WindowManager::getPlayerWindow($who) !== null) {
-            if(WindowManager::getPlayerWindow($who) !== $this) {
-                return false;
-            }
+        if (WindowManager::getPlayerWindow($who) !== null and WindowManager::getPlayerWindow($who) !== $this) {
+            return;
         }
 
         $pk = new UpdateBlockPacket();
@@ -163,13 +166,29 @@ class WindowInventory extends BaseInventory
 
         $inventory = $this;
 
-        unset($inventory->viewers[spl_object_hash($who)]);
-        $pk = new ContainerClosePacket();
-        $pk->windowid = $who->getWindowId($inventory);
-        $who->dataPacket($pk);
-        WindowManager::removePlayerWindow($who);
+        $this->process(
+            function () use ($who, $inventory) {
+                unset($inventory->viewers[spl_object_hash($who)]);
+                $pk = new ContainerClosePacket();
+                $pk->windowid = $who->getWindowId($inventory);
+                $who->dataPacket($pk);
+                WindowManager::removePlayerWindow($who);
+            }
+        );
+    }
 
-        return true;
+    /**
+     * @param callable $callable
+     * @param array $arguments
+     * @param int $delay
+     * @return void
+     */
+    public function process(callable $callable, array $arguments = [], int $delay = 5) {
+        if($delay > 0) {
+            Server::getInstance()->getScheduler()->scheduleDelayedTask(new CallbackTask($callable, $arguments), $delay);
+        } else {
+            $callable(...$arguments);
+        }
     }
 
     /**

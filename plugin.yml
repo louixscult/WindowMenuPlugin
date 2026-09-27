@@ -1,8 +1,8 @@
 name: WindowMenuPlugin
 description: WindowMenu library plugin from PocketMine-MP
-version: 0.2
+version: 0.2.1
 api: 2.0.0
-main: WindowMenuPlugin\WindowMenuLoader
+main: WindowMenu\WindowMenuLoader
 authors:
   - LearXD
   - louixscult

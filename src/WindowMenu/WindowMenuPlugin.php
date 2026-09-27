@@ -1,5 +1,15 @@
 <?php
 
+/*
+*  ██╗░░░░░███████╗░█████╗░██████╗░██╗░░██╗██████╗░
+*  ██║░░░░░██╔════╝██╔══██╗██╔══██╗╚██╗██╔╝██╔══██╗
+*  ██║░░░░░█████╗░░███████║██████╔╝░╚███╔╝░██║░░██║
+*  ██║░░░░░██╔══╝░░██╔══██║██╔══██╗░██╔██╗░██║░░██║
+*  ███████╗███████╗██║░░██║██║░░██║██╔╝╚██╗██████╔╝
+*  ╚══════╝╚══════╝╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚═╝╚═════╝░
+*              Author: LearXD#1044
+*/
+
 namespace WindowMenu;
 
 use pocketmine\command\CommandSender;
@@ -21,29 +31,37 @@ class WindowMenuPlugin extends PluginBase
 
     public function onCommand(CommandSender $sender, Command $command, $label, array $args)
     {
-        if ($command->getName() !== 'windowwtest') {
+        if ($command->getName() !== 'windowtest') {
             return;
         }
-
         if (!$sender instanceof Player) {
             return;
         }
-
+        $type = $args[0] ?? '';
+        if (empty($type)) {
+            $sender->sendMessage('§8- §eUse: §7/windowytest <single|double>');
+            return;
+        }
+        $type = $type == 'double' ? 2 : ($type == 'single' ? 1 : null);
+        if (is_null($type)) {
+            $sender->sendMessage('§8- §cType invalid! §7Types: single, double.');
+            return;
+        }
         $callback = function (WindowInventory $window, Player $player, Item $item, InventoryTransactionEvent $event) {
-            if ($item->getId() === Item::DIAMOND) {
-                $player->sendMessage('§8- §eYou clicked in diamond!');
+            if ($item->getId() === Item::EMERALD) {
+                $player->sendMessage('§8- §eYou clicked in emerald!');
                 $window->onClose($player);
             }
 
             $event->setCancelled(true);
         };
-
         $window = new WindowInventory(
             $sender->getPosition(),
             '§eWindow test',
-            WindowInventory::SINGLE_CHEST,
+            $type,
             $callback
         );
-        $window->setItem(0, Item::get(Item::DIAMOND, 0, 1));
+        $window->setItem(0, Item::get(Item::EMERALD, 0, 1));
+        $sender->addWindow($window);
     }
 }

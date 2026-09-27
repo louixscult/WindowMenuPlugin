@@ -1,4 +1,4 @@
-<h1 align="center"> WindowMenu Api v0.2 </h1>
+<h1 align="center"> WindowMenu Api v0.2.1 </h1>
 <p align="center"> A small library for creating interactive windows. </p>
 
 <h2 align="center"> 🔨 Usage: </h1>
