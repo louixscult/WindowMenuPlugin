@@ -1,43 +1,56 @@
-<h1 align="center"> WindowMenu Api v0.2.1 </h1>
+<h1 align="center"> WindowMenuPlugin v0.2.1 </h1>
 <p align="center"> A small library for creating interactive windows. </p>
 
-<h2 align="center"> 🔨 Usage: </h1>
+# What is this plugin?
+WindowMenuPlugin It is a plugin library that enables the creation of windows in PocketMine-MP 2.0.0. The plugin was based on library code and then transformed into a plugin because it was more practical to use.
 
-<h3 align="center"> :nerd_face: Explanation: </h1>
-<p>● Use the library mentioning as depend in plugin.yml  </p>
+# How use this plugin
+## 1. Plugin dependecies:
+To use the library, we first need to specify it in the `plugin.yml` file of your plugin. Follow the example below:
 
 ```yaml
-depend: WindowMenuPlugin
+name: YourPlugin
+version: 0.1
+depend: WindowMenuPlugin # <-- inform with a depedencie
+main: My\Plugin
+api: 2.0.0
 ```
-<p>● You can call the class just passing 4 parameters! The first is a provider, which may be your Main class. The second a Position, depending on the situation you can pass an instance of Player! The third is a string containing the menu name. The fourth and last containing a menu context. Example of a context: </p>
+
+## 2. Window closure:
+The closure in the library is used to add a function without having to manually specify the Windows event. The closure has 4 perimeters: the inventory, the player, the item, and the inventory transaction event.
+
+We have this example at below:
 
 ```php
-// The menu Callable receives 3 parameters, an InventoryTransacion Event (which can and should be canceled), a Player object, and an Item Object (which has been transitioned)
-
-$callable = function (Window $window, Player $player, Item $item, InventoryTransactionEvent $event) {
-  // doing a little item check...
-  if($item->getId() == \pocketmine\item\Item::EMERALD and $item->getCustomName("§dItem Name")){
-    // removing the window
-    $player->removeWindow($window);
-    // using the player variable '-'
-    $player->sendMessage("§aYou used window!");
-    // canceling event...
-    $event->setCanceled(true);
+$callback = function (
+  // -- Window Inventory --
+  WindowInventory $inventory,
+  // -- Window Player --
+  Player $player,
+  // -- Windows Item --
+  Item $item
+  // Window Listener Event (Inventory Transaction)
+  InventoryTransactionEvent $event
+) {
+  if($item->getId() == Item::EMERALD){
+    $inventory->onClose($player); // close window
+    $player->sendMessage("§aYou used window!"); // send message to player
+    $event->setCanceled(true); // cancel event
   }
-}
-
+};
 ```
 
-<p>● Now that we've created our context, we can call our class Window: </p>
+## 3. Send window to player:
+To send the window to the player, we need to create the inventory object, specifying the inventory location as required and optionally the name, type of chest, inventory itens and Inventory callable.
 
+We have the following example:
 ```php
-// Return the class from our window!
-$window = new \your\directory\Window($player->getPosition(), "Window Name", Window::DOUBLE_CHEST, $callable);
-
-// Adding an item to the window:
-$window->setItem(15, \pocketmine\item\Item::get(\pocketmine\item\Item::EMERALD)->setCustomName("§dItem Name"));
-
-// Sending the window to a player:
+$window = new WindowInventory(
+  $player->getPosition(),
+  '§eWindow Test',
+  WindowInventory::SINGLE_CHEST,
+  [Item::get(Item::EMERALD, 0, 1)],
+  $callback
+);
 $player->addWindow($window);
 ```
-<p> Done! 🐨</p>
