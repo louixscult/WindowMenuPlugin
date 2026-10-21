@@ -66,7 +66,7 @@ class WindowInventory extends BaseInventory
      */
     public function __construct(
         Position $invPos,
-        string $invName,
+        string $invName = null,
         int $invType = self::SINGLE_CHEST,
         array $invItems = [],
         callable $invClosure = null
@@ -102,11 +102,14 @@ class WindowInventory extends BaseInventory
 
         $compound = new CompoundTag("", [
             new StringTag("id", Tile::CHEST),
-            new StringTag("CustomName", $this->invCustomName),
             new IntTag("x", $x + $xPos),
             new IntTag("y", $y),
             new IntTag("z", $z)
         ]);
+
+        if (!is_null($this->invCustomName)) {
+            $compound->CustomName = new StringTag("CustomName", $this->invCustomName),
+        }
 
         if ($xPos === 0) {
             $compound->pairx = new IntTag("pairx", (int) $this->invPos->getX() + 1);
