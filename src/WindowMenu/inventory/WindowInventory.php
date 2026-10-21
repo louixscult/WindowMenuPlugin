@@ -20,10 +20,12 @@ use pocketmine\nbt\NBT;
 use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\nbt\tag\IntTag;
 use pocketmine\nbt\tag\StringTag;
+use pocketmine\tile\Tile;
 use pocketmine\network\protocol\BlockEntityDataPacket;
 use pocketmine\network\protocol\ContainerClosePacket;
 use pocketmine\network\protocol\ContainerOpenPacket;
 use pocketmine\network\protocol\UpdateBlockPacket;
+use pocketmine\network\protocol\DataPacket;
 use pocketmine\Player;
 use pocketmine\scheduler\CallbackTask;
 use pocketmine\Server;
@@ -32,177 +34,201 @@ use WindowMenu\manager\WindowManager;
 class WindowInventory extends BaseInventory
 {
 
-    const SINGLE_CHEST = 1;
-    const DOUBLE_CHEST = 2;
+    const SINGLE_CHEST = 0;
+    const DOUBLE_CHEST = 1;
+
+    const CHEST_SIZE = [
+        self::SINGLE_CHEST => 27,
+        self::DOUBLE_CHEST => 54
+    ];
 
     /** @var string */
-    protected $customName = '';
+    protected $invCustomName = '';
 
-    /** @var int */
-    protected $type = InventoryType::CHEST;
-
-    /** @var int */
-    protected $size = 27;
+    /** @var integer */
+    protected $invType = self::SINGLE_CHEST;
 
     /** @var Position */
-    protected $pos = null;
+    protected $invPos = null;
 
     /** @var FakeBlockMenu */
-    protected $holder = null;
+    protected $invHolder = null;
 
     /** @var callable */
-    protected $closure = null;
+    protected $invClosure = null;
 
     /**
-     * Window constructor.
-     *
-     * @param Position $position
-     * @param string $name
-     * @param callable $context
-     * @param int $type
-     * @param int $size
+     * @param Position $invPos
+     * @param string $invName
+     * @param int $invType - default -> 1 (single)
+     * @param Item[] $invItems
+     * @param callable $context - `(WindowInventory $window, Player $player, Item $item, InventoryTransactionEvent $event)`
      */
     public function __construct(
-        Position $position,
-        string $name,
-        int $size = self::SINGLE_CHEST,
-        callable $context = null,
-        int $type = InventoryType::CHEST
+        Position $invPos,
+        string $invName,
+        int $invType = self::SINGLE_CHEST,
+        array $invItems = [],
+        callable $invClosure = null
     ) {
-        $this->pos = $position->add(0, 2);
-        $this->customName = $name;
-        $this->closure = $context;
-        $this->type = $type;
-        $this->size = $size;
-
-        $this->holder = new FakeBlockMenu($this, $this->pos);
-        parent::__construct($this->holder, InventoryType::get($type));
+        $this->invPos = $invPos->add(0, 2, 0);
+        $this->invCustomName = $invName;
+        $this->invClosure = $invClosure;
+        $this->invType = $invType;
+        $this->invHolder = new FakeBlockMenu($this, $this->invPos);
+        parent::__construct(
+            $this->invHolder,
+            InventoryType::get(InventoryType::CHEST),
+            $invItems,
+            self::CHEST_SIZE[$invType]
+        );
     }
 
-    /**
-     * @param Player $who
-     * @return void
-     */
-    public function onOpen(Player $who)
+    protected function createChest(Player $player, int $xPos = 0)
     {
-        if (!$who->isOnline()) {
-            return;
-        }
+        $x = (int) $this->invPos->getX() + $xPos;
+        $y = (int) $this->invPos->getY();
+        $z = (int) $this->invPos->getZ();
 
         $pk = new UpdateBlockPacket();
-        $pk->x = $this->pos->x;
-        $pk->y = $this->pos->y;
-        $pk->z = $this->pos->z;
+        $pk->x = $x;
+        $pk->y = $y;
+        $pk->z = $z;
         $pk->blockId = 54;
         $pk->blockData = 0;
         $pk->flags = UpdateBlockPacket::FLAG_ALL;
-        $who->dataPacket($pk);
+
+        $player->dataPacket($pk);
 
         $compound = new CompoundTag("", [
-            new StringTag("id", InventoryType::CHEST),
-            new StringTag("CustomName", $this->customName),
-            new IntTag("x", (int) $this->pos->x),
-            new IntTag("y", (int) $this->pos->y),
-            new IntTag("z", (int) $this->pos->z)
+            new StringTag("id", Tile::CHEST),
+            new StringTag("CustomName", $this->invCustomName),
+            new IntTag("x", $x + $xPos),
+            new IntTag("y", $y),
+            new IntTag("z", $z)
         ]);
 
-        if($this->size >= self::DOUBLE_CHEST) {
-            $compound['pairx'] = new IntTag("pairx", ((int) $this->pos->getX()) + 1);
-            $compound['pairz'] = new IntTag("pairz", (int) $this->pos->getZ());
+        if ($xPos === 0) {
+            $compound->pairx = new IntTag("pairx", (int) $this->invPos->getX() + 1);
+            $compound->pairz = new IntTag("pairz", $z);
         }
 
         $nbt = new NBT(NBT::LITTLE_ENDIAN);
         $nbt->setData($compound);
 
         $pk = new BlockEntityDataPacket();
-        $pk->x = $this->holder->x;
-        $pk->y = $this->holder->y;
-        $pk->z = $this->holder->z;
+        $pk->x = $x + $xPos;
+        $pk->y = $y;
+        $pk->z = $z;
         $pk->namedtag = $nbt->write();
-        $who->dataPacket($pk);
-
-        $inventory = $this;
-        $inventory->viewers[spl_object_hash($who)] = $who;
-
-        $this->process(
-            function () use ($who, $inventory) {
-                $pk = new ContainerOpenPacket();
-                $pk->windowid = $who->getWindowId($inventory);
-                $pk->type = $inventory->getType()->getNetworkType();
-                $pk->slots = $inventory->getSize();
-                $pk->x = $inventory->pos->getX();
-                $pk->y = $inventory->pos->getY();
-                $pk->z = $inventory->pos->getZ();
-
-                $who->dataPacket($pk);
-                $this->sendContents($who);
-                WindowManager::addPlayerWindow($who, $inventory);
-            }
-        );
+        $player->dataPacket($pk);
     }
 
-    /**
-     * @param Player $who
-     * @return void
-     */
+    protected function removeChest(Player $player, int $xPos = 0)
+    {
+        $blockX = (int) $this->invPos->getX() + $xPos;
+        $blockY = (int) $this->invPos->getY();
+        $blockZ = (int) $this->invPos->getZ();
+
+        $pk = new UpdateBlockPacket();
+        $pk->x = $blockX;
+        $pk->y = $blockY;
+        $pk->z = $blockZ;
+        $pk->blockId = $player->getLevel()->getBlockIdAt($blockX, $blockY, $blockZ);
+        $pk->blockData = $player->getLevel()->getBlockDataAt($blockX, $blockY, $blockZ);
+        $pk->flags = UpdateBlockPacket::FLAG_NONE;
+
+        $player->dataPacket($pk);
+    }
+
+    public function onOpen(Player $who)
+    {
+        if (!$who->isOnline()) {
+            return;
+        }
+
+        $this->createChest($who);
+
+        if ($this->invType == self::DOUBLE_CHEST) {
+            $this->createChest($who, 1);
+        }
+
+        $inventory = $this;
+
+        $this->process(function () use ($who, $inventory) {
+            if (!$who->isOnline()) {
+                return;
+            }
+
+            $inventory->viewers[spl_object_hash($who)] = $who;
+
+            $pk = new ContainerOpenPacket();
+            $pk->windowid = $who->getWindowId($inventory);
+            $pk->type = $inventory->getType()->getNetworkType();
+            $pk->slots = $inventory->getSize();
+            $pk->x = (int) $inventory->invPos->getX();
+            $pk->y = (int) $inventory->invPos->getY();
+            $pk->z = (int) $inventory->invPos->getZ();
+
+            $who->dataPacket($pk);
+            $inventory->sendContents($who);
+
+            WindowManager::addPlayerWindow($who, $inventory);
+        });
+    }
+
     public function onClose(Player $who)
     {
         if (!$who->isOnline()) {
             return;
         }
 
-        if (WindowManager::getPlayerWindow($who) !== null and WindowManager::getPlayerWindow($who) !== $this) {
+        if (
+            WindowManager::getPlayerWindow($who) !== null &&
+            WindowManager::getPlayerWindow($who) !== $this
+        ) {
             return;
         }
 
-        $pk = new UpdateBlockPacket();
-        $pk->x = $this->holder->x;
-        $pk->y = $this->holder->y;
-        $pk->z = $this->holder->z;
-        $pk->blockId = $who->getLevel()->getBlockIdAt($this->holder->x, $this->holder->y, $this->holder->z);
-        $pk->blockData = $who->getLevel()->getBlockDataAt($this->holder->x, $this->holder->y, $this->holder->z);
-        $pk->flags = UpdateBlockPacket::FLAG_NONE;
-        $who->dataPacket($pk);
+        $this->removeChest($who);
+
+        if ($this->invType == self::DOUBLE_CHEST) {
+            $this->removeChest($who, 1);
+        }
 
         $inventory = $this;
 
-        $this->process(
-            function () use ($who, $inventory) {
-                unset($inventory->viewers[spl_object_hash($who)]);
-                $pk = new ContainerClosePacket();
-                $pk->windowid = $who->getWindowId($inventory);
-                $who->dataPacket($pk);
-                WindowManager::removePlayerWindow($who);
-            }
-        );
+        $this->process(function () use ($who, $inventory) {
+            unset($inventory->viewers[spl_object_hash($who)]);
+
+            $pk = new ContainerClosePacket();
+            $pk->windowid = $who->getWindowId($inventory);
+
+            $who->dataPacket($pk);
+            WindowManager::removePlayerWindow($who);
+        });
     }
 
-    /**
-     * @param callable $callable
-     * @param array $arguments
-     * @param int $delay
-     * @return void
-     */
-    public function process(callable $callable, array $arguments = [], int $delay = 5) {
-        if($delay > 0) {
-            Server::getInstance()->getScheduler()->scheduleDelayedTask(new CallbackTask($callable, $arguments), $delay);
+    public function process(callable $callable, array $arguments = [], int $delay = 10)
+    {
+        if ($delay > 0) {
+            Server::getInstance()->getScheduler()->scheduleDelayedTask(
+                new CallbackTask($callable, $arguments),
+                $delay
+            );
         } else {
-            $callable(...$arguments);
+            call_user_func_array($callable, $arguments);
         }
     }
 
-    /**
-     * @param callable $callable
-     * @returnh void
-     */
     public function setClosure(callable $callable)
     {
-        return $this->closure = $callable;
+        $this->invClosure = $callable;
+        return $this;
     }
 
-    /** @return callable */
-    public function getClosure()
+    public function getClosure(): callable
     {
-        return $this->closure;
+        return $this->invClosure;
     }
 }
