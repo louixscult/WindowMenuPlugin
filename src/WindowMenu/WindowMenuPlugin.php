@@ -39,29 +39,31 @@ class WindowMenuPlugin extends PluginBase
         }
         $type = $args[0] ?? '';
         if (empty($type)) {
-            $sender->sendMessage('§8- §eUse: §7/windowytest <single|double>');
+            $sender->sendMessage('§8- §eUse: §7/windowtest <single|double>');
             return;
         }
-        $type = $type == 'double' ? 2 : ($type == 'single' ? 1 : null);
-        if (is_null($type)) {
+        $typeInv = null;
+        if ($type == 'single') {
+            $typeInv = WindowInventory::SINGLE_CHEST;
+        } else if ($type == 'double') {
+            $typeInv = WindowInventory::DOUBLE_CHEST;
+        } else {
             $sender->sendMessage('§8- §cType invalid! §7Types: single, double.');
-            return;
         }
         $callback = function (WindowInventory $window, Player $player, Item $item, InventoryTransactionEvent $event) {
             if ($item->getId() === Item::EMERALD) {
                 $player->sendMessage('§8- §eYou clicked in emerald!');
                 $window->onClose($player);
             }
-
             $event->setCancelled(true);
         };
         $window = new WindowInventory(
             $sender->getPosition(),
-            '§eWindow test',
-            $type,
+            '§eWindow Test',
+            $typeInv,
+            [Item::get(Item::EMERALD, 0, 1)],
             $callback
         );
-        $window->setItem(0, Item::get(Item::EMERALD, 0, 1));
         $sender->addWindow($window);
     }
 }
