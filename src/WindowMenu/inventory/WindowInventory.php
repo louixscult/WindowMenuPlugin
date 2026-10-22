@@ -108,7 +108,7 @@ class WindowInventory extends BaseInventory
         ]);
 
         if (!is_null($this->invCustomName)) {
-            $compound->CustomName = new StringTag("CustomName", $this->invCustomName),
+            $compound->CustomName = new StringTag("CustomName", $this->invCustomName);
         }
 
         if ($xPos === 0) {
